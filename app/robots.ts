@@ -21,7 +21,13 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/newsletter/confirmer", "/newsletter/desinscription"],
+        disallow: [
+          "/api/",
+          "/admin/",
+          "/admin",
+          "/newsletter/confirmer",
+          "/newsletter/desinscription",
+        ],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHero, SecHead, CtaBand } from "@/components/sections/common";
 import { roles, steps, engagementsNote } from "@/lib/content/bilingue";
 import { poleStatuses } from "@/lib/content/bilingue";
+import { membresPublies } from "@/lib/content/editorial";
 import { t } from "@/lib/locale";
 import { pageMeta, seo, breadcrumbLd, JsonLd } from "@/lib/seo";
 
@@ -13,6 +14,8 @@ export const metadata = pageMeta({
 });
 
 export default function ReseauPage() {
+  const membres = membresPublies();
+
   return (
     <>
       <JsonLd
@@ -77,9 +80,32 @@ export default function ReseauPage() {
                   <span className="post__kind">{`Pôle ${p.pole.num.fr}`}</span>
                 </div>
                 <h3 className="post__title">{t(p.pole.title, "fr")}</h3>
-                <p className="post__text">{t(p.fonction, "fr")}</p>
+                {p.membres.length > 0 ? (
+                  <ul className="member-list">
+                    {p.membres.map((m) => (
+                      <li key={m.id}>
+                        <strong>{m.nom}</strong>
+                        {t(m.fonction, "fr") ? <span>{t(m.fonction, "fr")}</span> : null}
+                        {m.lien ? (
+                          <a
+                            className="link-inline"
+                            href={m.lien}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Profil <i className="ph ph-arrow-up-right" aria-hidden="true"></i>
+                          </a>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="post__text">{t(p.fonction, "fr")}</p>
+                )}
                 <div className="post__foot">
-                  <span className="tag">{t(p.statut, "fr")}</span>
+                  <span className="tag">
+                    {p.membres.length > 0 ? "Profil publié" : t(p.statut, "fr")}
+                  </span>
                   <Link className="link-arrow" href={`/expertises/${p.pole.slug.fr}/`}>
                     Voir le pôle <i className="ph ph-arrow-right" aria-hidden="true"></i>
                   </Link>
@@ -88,14 +114,16 @@ export default function ReseauPage() {
             ))}
           </div>
 
-          <div className="empty reveal" style={{ marginTop: "var(--s8)" }}>
-            <i className="ph ph-user-circle-dashed" aria-hidden="true"></i>
-            <h3>Les fiches détaillées attendent les accords</h3>
-            <p>
-              Chaque personne est publiée une fois qu&apos;elle a donné son accord sur son nom,
-              sa fonction et son lien professionnel. Les fiches apparaîtront ici.
-            </p>
-          </div>
+          {membres.length === 0 ? (
+            <div className="empty reveal" style={{ marginTop: "var(--s8)" }}>
+              <i className="ph ph-user-circle-dashed" aria-hidden="true"></i>
+              <h3>Les fiches détaillées attendent les accords</h3>
+              <p>
+                Chaque personne est publiée une fois qu&apos;elle a donné son accord sur son nom,
+                sa fonction et son lien professionnel. Les fiches apparaîtront ici.
+              </p>
+            </div>
+          ) : null}
         </div>
       </section>
 

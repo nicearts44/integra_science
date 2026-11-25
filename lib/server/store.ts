@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 
@@ -53,4 +53,47 @@ export function writeSubscribers(list: Subscriber[]) {
 
 export function findByToken(token: string): Subscriber | undefined {
   return readSubscribers().find((s) => s.token === token);
+}
+
+/* ------------------------------------------------------------------ */
+/* Lecture pour le back-office                                        */
+/* ------------------------------------------------------------------ */
+
+export type SoumissionListee = {
+  kind: string;
+  fichier: string;
+  date: string;
+  donnees: Record<string, unknown>;
+};
+
+/** Toutes les soumissions enregistrées, de la plus récente à la plus ancienne. */
+export function listerSoumissions(): SoumissionListee[] {
+  const base = path.join(DATA_DIR, "forms");
+  if (!existsSync(base)) return [];
+
+  const sorties: SoumissionListee[] = [];
+  for (const kind of readdirSync(base)) {
+    const dossier = path.join(base, kind);
+    if (!statSync(dossier).isDirectory()) continue;
+    for (const fichier of readdirSync(dossier)) {
+      if (!fichier.endsWith(".json")) continue;
+      try {
+        const donnees = JSON.parse(readFileSync(path.join(dossier, fichier), "utf8")) as Record<
+          string,
+          unknown
+        >;
+        const recu = donnees.recu_le ?? donnees.date ?? donnees.receivedAt;
+        sorties.push({
+          kind,
+          fichier,
+          date: typeof recu === "string" ? recu : fichier.slice(0, 19),
+          donnees,
+        });
+      } catch {
+        /* fichier illisible : ignoré, il n'empêche pas de lire les autres */
+      }
+    }
+  }
+
+  return sorties.sort((a, b) => b.fichier.localeCompare(a.fichier));
 }

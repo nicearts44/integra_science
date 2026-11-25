@@ -12,3 +12,7 @@ next-env.d.ts
 
 # Bundle temporaire du script d'import Sanity
 .sanity-import/
+
+# Journaux du serveur local
+start.log
+*.log

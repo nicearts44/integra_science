@@ -605,16 +605,18 @@ Toutes doivent répondre `200`.
 
 ### 10.1 Vercel (recommandé, gratuit)
 
-1. Pousser le dépôt sur GitHub :
+1. Pousser le dépôt sur GitHub (depuis `F:\integra_science\integra-science`) :
    ```powershell
-   git add .
+   git add -A
    git commit -m "Mise en production"
    git push
    ```
-2. **https://vercel.com** → *Add New… Project* → importer le dépôt.
+2. **https://vercel.com** → *Add New… Project* → importer le dépôt `nicearts44/integra_science`.
 3. Réglages :
    - Framework preset : **Next.js** (détecté)
-   - Root directory : `integra-science` si le dépôt contient aussi `maquettes/` et les `.md`
+   - Root directory : `./` — le dépôt contient **le projet lui-même** (`package.json` à la racine du
+dépôt). N'écris pas `integra-science` : ce dossier n'existe pas dans le dépôt, le build échouerait
+sur un « No package.json found ».
    - Build command : `npm run build` (par défaut)
 4. **Environment Variables** — ajouter, pour *Production* et *Preview* :
    ```
@@ -675,6 +677,385 @@ npx sanity dataset export production backup.tar.gz
 À faire après chaque vague de publications. Le contenu du code (`lib/content/*`) est dans Git ;
 le contenu du CMS, non — d'où cet export.
 
+### 10.6 Le cycle quotidien : modifier → GitHub → Vercel
+
+Une modification locale ne part **pas** toute seule sur GitHub, et un dépôt GitHub n'est **pas** un
+site en ligne. Vercel reconstruit le site quand — et seulement quand — un commit arrive sur la
+branche `main`.
+
+**Prérequis, une seule fois** — dans *vercel.com* → projet → **Settings** → **Git** :
+
+| Réglage | Valeur attendue |
+|---|---|
+| Connected Git Repository | `nicearts44/integra_science` |
+| Production Branch | `main` |
+| Root Directory | `./` |
+
+---
+
+#### 1. Se placer dans le dossier du projet
+
+Le `package.json` est dans `integra-science`, pas à la racine `F:\integra_science` :
+
+```powershell
+cd F:\integra_science\integra-science
+```
+
+> C'est l'erreur la plus fréquente : `npm error path F:\integra_science\package.json` signifie
+> simplement que la commande a été lancée un dossier trop haut.
+
+#### 2. Récupérer la dernière version en ligne
+
+À faire **avant** de commencer à modifier :
+
+```powershell
+cd F:\integra_science\integra-science
+git pull --rebase
+```
+
+`Already up to date.` = rien n'a bougé depuis la dernière fois.
+
+#### 3. Modifier, puis regarder le résultat en local
+
+```powershell
+npm run dev
+```
+
+Ouvrir `http://127.0.0.1:3000/`. `Ctrl + C` dans le terminal pour arrêter.
+
+#### 4. Vérifier ce qui a changé
+
+```powershell
+git status     # liste des fichiers touchés
+git diff       # le détail ligne par ligne (q pour quitter)
+```
+
+#### 5. Enregistrer la modification (commit)
+
+```powershell
+git add -A
+git commit -m "Pôle Biologie : précision sur l'interprétation"
+```
+
+Le message décrit **pourquoi** la modification a été faite : il apparaît dans l'historique et
+sur Vercel.
+
+#### 6. Envoyer sur GitHub (push)
+
+```powershell
+git push
+```
+
+#### 7. Laisser Vercel reconstruire
+
+1. *vercel.com* → projet → **Deployments** : une ligne *Building* apparaît dans les secondes qui
+   suivent le push.
+2. 2 à 4 minutes plus tard : *Ready*. L'URL de production sert le nouveau build.
+3. Si *Error* : ouvrir le déploiement → **Building** (les logs). L'erreur est la même qu'un
+   `npm run build` en local.
+
+#### 8. Vérifier en ligne
+
+Recharger le site avec `Ctrl + F5`. Si c'est bon, c'est terminé.
+
+---
+
+**Tout en une seule commande** (après les étapes 1 et 2) :
+
+```powershell
+git add -A; git commit -m "Description courte de la modification"; git push
+```
+
+**Demander à l'agent de le faire** : « commit et pousse mes modifications ». Le dépôt distant et
+l'identité Git sont configurés sur cette machine, l'agent peut exécuter `git add / commit / push`
+(il ne le fait que sur demande).
+
+**Ce qui ne déclenche rien** :
+
+| Situation | Effet |
+|---|---|
+| Fichier modifié, pas de commit | rien |
+| Commit fait, pas de push | rien (le commit reste sur la machine) |
+| Push sur une autre branche que `main` | Vercel produit une *Preview*, la production ne change pas |
+| Push sur `main` | build de production automatique |
+
+---
+
+### 10.7 Résoudre un conflit Git
+
+Un conflit n'arrive que dans un seul cas : **les mêmes lignes d'un même fichier ont été modifiées
+à deux endroits** (toi en local, et une autre modification arrivée sur GitHub). Rien n'est perdu :
+Git s'arrête et demande de choisir.
+
+#### Cas 1 — le push est refusé
+
+```
+! [rejected]  main -> main (fetch first)
+error: failed to push some refs
+```
+
+GitHub a un commit que tu n'as pas encore. On l'intègre, puis on renvoie :
+
+```powershell
+git pull --rebase
+git push
+```
+
+Si `git pull --rebase` répond `Successfully rebased`, tout est réglé. Sinon, voir le cas 2.
+
+#### Cas 2 — le pull s'arrête sur un conflit
+
+```
+CONFLICT (content): Merge conflict in lib/content/poles.ts
+error: could not apply 4f2a1c9...
+```
+
+1. Voir les fichiers en conflit :
+
+   ```powershell
+   git status
+   ```
+
+   Section **Unmerged paths** (« both modified »).
+
+2. Ouvrir le fichier. Git a inséré des marqueurs :
+
+   ```
+   <<<<<<< HEAD
+   Le texte déjà en ligne
+   =======
+   Mon texte local
+   >>>>>>> 4f2a1c9 (Pôle Biologie…)
+   ```
+
+3. Garder la bonne version — souvent **les deux**, réécrites proprement — puis **supprimer les trois
+   marqueurs** (`<<<<<<<`, `=======`, `>>>>>>>`). Le fichier doit redevenir du code normal.
+
+4. Marquer le fichier résolu et continuer :
+
+   ```powershell
+   git add lib/content/poles.ts
+   git rebase --continue
+   ```
+
+   Répéter pour chaque fichier de la liste.
+
+5. Envoyer :
+
+   ```powershell
+   git push
+   ```
+
+#### Choisir une version entière, sans éditer
+
+```powershell
+git checkout --ours   lib/content/poles.ts   # garder la version déjà en ligne
+git checkout --theirs lib/content/poles.ts   # garder ma version locale
+git add lib/content/poles.ts
+git rebase --continue
+```
+
+#### Tout annuler et revenir à l'état d'avant
+
+```powershell
+git rebase --abort        # si le message parlait de « rebase »
+git merge --abort         # si le message parlait de « merge »
+```
+
+#### Mettre ses modifications de côté avant un pull
+
+```powershell
+git stash        # range les modifications non enregistrées
+git pull --rebase
+git stash pop    # les remet en place (un conflit peut apparaître ici aussi)
+```
+
+#### Fichiers à risque dans ce projet
+
+| Fichier | Réflexe |
+|---|---|
+| `lib/content/poles.ts`, `prestations.ts` | conflit de texte : fusionner les deux versions à la main, puis `npm run dev` pour relire |
+| `package-lock.json` | ne pas éditer : `git checkout --theirs package-lock.json`, puis `npm install`, puis `git add package-lock.json` |
+| `GUIDE.md`, `README.md` | fusionner les deux paragraphes |
+| `next.config.ts`, `app/**`, `components/**` | relire le résultat : un demi-fichier cassera le build |
+| `.env.local`, `node_modules/`, `.next/` | jamais versionnés, donc jamais en conflit |
+
+#### Après tout conflit résolu
+
+`npm run build` doit passer **avant** de pousser. Un build cassé en local = un déploiement Vercel
+en échec, et le site reste sur la version précédente.
+
+#### Retrouver ce qu'on a fait
+
+```powershell
+git log --oneline --graph -15   # les 15 derniers commits
+git reflog                     # tout, y compris les opérations annulées
+```
+
+---
+
+### 10.8 Reconstruire le site quand le contenu change dans Sanity
+
+Le site est statique : une modification faite dans le Studio ne se voit **qu'après un nouveau
+build**. Le branchement tient en deux réglages, à faire une seule fois.
+
+#### 1. Créer un « Deploy Hook » sur Vercel
+
+*vercel.com* → projet → **Settings** → **Git** → **Deploy Hooks** :
+
+- Name : `sanity-content`
+- Branch : `main`
+
+→ **Create Hook**, puis **copier l'URL** (elle ressemble à
+`https://api.vercel.com/v1/integrations/deploy/prj_xxxx/yyyy`).
+
+> C'est un secret : ne pas la coller dans un fichier du dépôt.
+
+#### 2. Appeler cette URL depuis Sanity
+
+*sanity.io/manage* → projet → **API** → **Webhooks** → **Create webhook** :
+
+| Champ | Valeur |
+|---|---|
+| Name | `vercel-rebuild` |
+| URL | l'URL du Deploy Hook |
+| Dataset | `production` |
+| Trigger on | Create, Update, Delete |
+| Filter | `_type in ["pole", "prestation", "publication", "actualite", "parametresSite"]` |
+| Projection | `{_id}` |
+
+→ **Save**, puis **Send test** : Vercel doit afficher un déploiement supplémentaire.
+
+#### 3. Vérifier
+
+Publier un vrai document dans le Studio, attendre 2 à 4 minutes, recharger le site.
+
+#### Limite à connaître aujourd'hui
+
+Les pages **pôles** et **prestations** lisent encore les fichiers locaux (`lib/content/*.ts`), pas
+Sanity. Un webhook Sanity redéploie donc bien le site, mais ne changera le texte de
+`/expertises/biologie/` que le jour où ces pages seront branchées sur `getPoleSanity()`. Seuls les
+**paramètres du site** (en-tête, pied de page, coordonnées) viennent déjà de Sanity.
+
+#### Relancer un déploiement à la main
+
+*Deployments* → ligne du dernier build → `⋯` → **Redeploy**. Un commit vide ne sert à rien.
+
+---
+
+### 10.9 Ce qu'il ne faut jamais mettre dans Git
+
+Déjà couvert par `.gitignore` : `node_modules/`, `.next/`, `out/`, `build/`, `data/`, `.env`,
+`.env.local`, `*.tsbuildinfo`, `.sanity-import/`, `start.log`.
+
+Contrôle rapide :
+
+```powershell
+git status --ignored --short | Select-String "^!!"
+```
+
+Si un fichier interdit est **déjà suivi** (erreur passée), le retirer de l'index sans le supprimer
+du disque :
+
+```powershell
+git rm --cached start.log
+git commit -m "Retirer les journaux du dépôt"
+git push
+```
+
+> Un secret déjà poussé reste dans l'historique : le seul vrai remède est de le **régénérer**
+> (nouveau token Sanity, nouvelle clé Brevo) et de mettre à jour `.env.local` et Vercel.
+
+### 10.10 Le back-office : gérer le site sans code
+
+À partir d'ici, plus rien ne s'édite dans les fichiers à la main. Le site a son propre espace de
+gestion, indépendant de Sanity.
+
+**Adresse :** `/admin/` (exemple en local : `http://localhost:3000/admin/`). La page n'est ni
+indexée ni liée depuis le site public.
+
+**Le contenu vit dans `content/`**, un fichier JSON par famille : `publications.json`,
+`cas-usage.json`, `actualites.json`, `reseau.json`, `reglages.json`. Ils sont versionnés avec le
+code : l'historique complet des textes est dans Git.
+
+#### Se connecter
+
+1. Ouvrir `/admin/` : la page de connexion s'affiche.
+2. Saisir le mot de passe (`ADMIN_PASSWORD`).
+3. La session dure sept jours, un bouton « Se déconnecter » est en bas du menu.
+
+En développement, si `ADMIN_PASSWORD` n'est pas défini, le mot de passe de repli est `integra`.
+En production, sans `ADMIN_PASSWORD`, la connexion est fermée : c'est volontaire.
+
+#### Les sections
+
+| Section | Ce qu'on y fait |
+|---|---|
+| Publications | Articles, communications, rapports |
+| Cas d'usage | Situation, question, travail fait, limites |
+| Actualités | Le fil daté du réseau |
+| Réseau | Membres, fonctions, engagements |
+| Messages | Les trois formulaires reçus, export CSV |
+| Newsletter | Abonnés et statuts, export CSV |
+| Réglages | Coordonnées, réseaux, citation, mentions légales |
+
+#### Écrire une référence, pas à pas
+
+1. **+ Nouvelle entrée**. Un brouillon est créé.
+2. Remplir le français ; l'anglais est facultatif (le site retombe sur le français).
+3. Vérifier l'identifiant d'URL : « Régénérer l'identifiant depuis le titre » le recalcule.
+4. Pour une publication ou un cas d'usage, cocher les deux cases : **Vérifié** et **Anonymisé**.
+   Sans les deux, le site ne l'affiche pas, quel que soit le statut.
+5. Passer le statut sur **Publié**.
+6. **Enregistrer** (ou `Ctrl+S`).
+
+Un bandeau en haut de la fiche dit toujours si l'entrée est visible ou pourquoi elle ne l'est pas.
+
+#### Ce que fait « Enregistrer »
+
+| Où | Ce qui se passe |
+|---|---|
+| En local | le fichier `content/*.json` est mis à jour, la page se recharge aussitôt |
+| Sur Vercel, avec `ADMIN_GITHUB_TOKEN` | un commit est créé dans le dépôt ; Vercel reconstruit et publie (une à deux minutes) |
+| Sur Vercel, sans token | l'enregistrement est refusé avec un message explicite |
+
+#### Variables à définir sur l'hébergement
+
+```text
+ADMIN_PASSWORD=…           # obligatoire : mot de passe du back-office
+ADMIN_SECRET=…             # recommandé : signe le cookie (sinon ADMIN_PASSWORD sert de secret)
+ADMIN_GITHUB_TOKEN=…       # token fine-grained, Contents: Read and write, ce dépôt uniquement
+ADMIN_GITHUB_REPO=nicearts44/integra_science
+ADMIN_GITHUB_BRANCH=main
+```
+
+Après modification des variables, redéployer une fois pour qu'elles prennent effet.
+
+#### Réseau : la règle de l'accord
+
+Un membre n'apparaît sur `/reseau/` que si les trois conditions sont réunies : statut `Publié`,
+case **Accord écrit** cochée, et un nom renseigné. Le pôle affiche alors le nom, la fonction et le
+lien ; sans membre publié, il garde « Responsable de pôle · fonction à renseigner ».
+
+#### Ce qui reste à brancher
+
+Les sections *Messages* et *Newsletter* lisent le stockage fichier (`data/`). Sur Vercel, ce dossier
+n'est pas persistant : il faut une base (`DATABASE_URL`) pour conserver durablement les messages et
+les abonnés. Tant que ce n'est pas fait, l'email reste la source fiable pour les messages, et le
+formulaire de newsletter n'est pas réparable.
+
+#### Revenir en arrière
+
+Chaque enregistrement sur GitHub est un commit :
+
+```powershell
+git log --oneline -- content/
+git revert <sha>
+git push
+```
+
+Le déploiement Vercel repart de la version précédente.
+
 ---
 
 ## 11. Dépannage
@@ -691,6 +1072,13 @@ le contenu du CMS, non — d'où cet export.
 | Formulaire : « enregistré » mais pas d'email | Brevo non configuré | renseigner `BREVO_API_KEY` et `CONTACT_DESTINATAIRE` |
 | Le port 3000 est occupé | ancien serveur | `npx kill-port 3000` ou redémarrer la machine |
 | `next build` échoue sur un type | contenu ou composant modifié | lire l'erreur : elle nomme le fichier et le champ |
+| `npm error path F:\integra_science\package.json` | commande lancée à la racine au lieu de `integra-science` | `cd F:\integra_science\integra-science` |
+| `git push` refusé (`fetch first`) | GitHub a des commits plus récents | `git pull --rebase` puis `git push` (§ 10.7) |
+| `CONFLICT` au `git pull` | même fichier modifié à deux endroits | § 10.7 |
+| `Author identity unknown` | identité Git non configurée | `git config user.name "nicearts44"` et `git config user.email "nicephoreagossou44@gmail.com"` |
+| Vercel : « No package.json found » | Root Directory mal réglé | Settings → Build → Root Directory = `./` |
+| Le site ne change pas après un `push` | mauvais dépôt ou mauvaise branche | Settings → Git : `nicearts44/integra_science`, branche `main` |
+| Le site ne change pas après une publication Sanity | pas de Deploy Hook, ou page non branchée sur le CMS | § 10.8 |
 
 ---
 

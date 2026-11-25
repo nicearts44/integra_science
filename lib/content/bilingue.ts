@@ -30,6 +30,14 @@ import {
 } from "./reseau";
 import * as visionFr from "./vision";
 import * as referencesFr from "./references";
+import {
+  actualitesPubliees as actualitesEditoriales,
+  casPublies as casEditoriaux,
+  engagementsEditoriaux,
+  membresDuPole,
+  publicationsPubliees as publicationsEditoriales,
+  rolesEditoriaux,
+} from "./editorial";
 
 import { polesEn } from "./en/poles";
 import { livrablesPageEn, perimetreExcluEn, prestationsEn } from "./en/prestations";
@@ -169,7 +177,9 @@ export const steps = {
     return translate(s, en) as unknown as FlowStepBilingue;
   }) as FlowStepBilingue[],
   tracesRemises: mergeByIndex(tracesRemises, tracesRemisesEn),
-  engagements: mergeByIndex(engagementsFr, engagementsEn),
+  engagements: (engagementsEditoriaux() ?? mergeByIndex(engagementsFr, engagementsEn)) as Array<
+    { icon: string } & { title: L; text: L }
+  >,
   engagementsNote: translate(engagementsNote, engagementsNoteEn) as unknown as {
     fr: string;
     en: string;
@@ -186,7 +196,7 @@ export type RoleBilingue = { key: string } & {
   tag: L;
 };
 
-export const roles = (rolesFr as Array<Record<string, unknown>>).map((r, i) => {
+const rolesStatiques = (rolesFr as Array<Record<string, unknown>>).map((r, i) => {
   const en = rolesEn[i] as Record<string, unknown> | undefined;
   const tr = translate(r, en) as Record<string, unknown>;
   return {
@@ -197,6 +207,9 @@ export const roles = (rolesFr as Array<Record<string, unknown>>).map((r, i) => {
     tag: tr.tag as L,
   };
 }) as RoleBilingue[];
+
+/** Les fonctions saisies dans le back-office prennent le pas sur les textes statiques. */
+export const roles: RoleBilingue[] = rolesEditoriaux() ?? rolesStatiques;
 
 /**
  * État de chaque pôle. Dérivé des pôles eux-mêmes : le nom du pôle n'est
@@ -210,6 +223,8 @@ export const poleStatuses = poles.map((p) => {
     pole: p,
     fonction: translate(fr?.fonction, en?.fonction) as unknown as { fr: string; en: string },
     statut: translate(fr?.statut, en?.statut) as unknown as { fr: string; en: string },
+    /** Membres publiés du pôle — vide tant qu'aucun accord n'est enregistré. */
+    membres: membresDuPole(p.key),
   };
 });
 
@@ -282,9 +297,9 @@ export const methodePage = {
  * pages affichent alors leurs gabarits.
  */
 export const catalogues = {
-  publications: translate(referencesFr.publicationsPubliees(), referencesEn.publicationsEn),
-  casUsage: translate(referencesFr.casPublies(), referencesEn.casUsageEn),
-  actualites: translate(referencesFr.actualitesPubliees(), referencesEn.actualitesEn),
+  publications: publicationsEditoriales(),
+  casUsage: casEditoriaux(),
+  actualites: actualitesEditoriales(),
 };
 
 /**
