@@ -1,0 +1,114 @@
+/* ===================================================================
+   Habillage projet — HORS système validé.
+   styles/integra.css et styles/integra-plus.css restent des copies
+   non modifiées des maquettes (règle de fidélité CONTEXT_MVP § 3bis.4).
+   Ce fichier ne contient que :
+   1. le pont vers les variables de polices de next/font ;
+   2. les compléments propres aux composants absents des maquettes
+      (lettre d'information, formulaires, états de succès).
+   =================================================================== */
+
+:root {
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-instrument), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* ---------- Honeypot : invisible pour l'utilisateur, rempli par les bots ---------- */
+.honeypot {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  tab-index: -1;
+}
+
+/* ---------- Formulaire de lettre d'information ---------- */
+.newsletter-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+
+.newsletter-form .field__label {
+  font-size: var(--fs-label);
+}
+
+.consent {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  font-size: .8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.consent input {
+  margin-top: 3px;
+  flex: none;
+  accent-color: var(--accent-ink);
+}
+
+.newsletter-form .form__note {
+  font-size: .8125rem;
+  color: var(--text-subtle);
+}
+
+/* ---------- Mention conditionnelle (contact, pied de page) ---------- */
+.contact-line {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+  font-size: var(--fs-body-sm);
+  color: var(--text-muted);
+}
+
+.contact-line i {
+  color: var(--accent-ink);
+  font-size: 15px;
+}
+
+/* ---------- Colonnes de contenu légal ---------- */
+.prose-legal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  max-width: 72ch;
+}
+
+.prose-legal h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: var(--s6);
+}
+
+.prose-legal p {
+  font-size: var(--fs-body-sm);
+  color: var(--text-body);
+  line-height: 1.7;
+}
+
+.prose-legal ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-left: 1.1em;
+}
+
+.prose-legal li {
+  font-size: var(--fs-body-sm);
+  color: var(--text-body);
+  line-height: 1.6;
+}
+
+.prose-legal a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
