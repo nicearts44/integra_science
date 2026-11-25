@@ -978,14 +978,43 @@ indexée ni liée depuis le site public.
 `cas-usage.json`, `actualites.json`, `reseau.json`, `reglages.json`. Ils sont versionnés avec le
 code : l'historique complet des textes est dans Git.
 
-#### Se connecter
+#### Le premier compte (une seule fois)
 
-1. Ouvrir `/admin/` : la page de connexion s'affiche.
-2. Saisir le mot de passe (`ADMIN_PASSWORD`).
-3. La session dure sept jours, un bouton « Se déconnecter » est en bas du menu.
+Au tout premier accès, `/admin/` propose de **créer le compte propriétaire** : nom, adresse
+électronique, mot de passe (10 caractères minimum, lettres et chiffres).
 
-En développement, si `ADMIN_PASSWORD` n'est pas défini, le mot de passe de repli est `integra`.
-En production, sans `ADMIN_PASSWORD`, la connexion est fermée : c'est volontaire.
+Si la variable `ADMIN_PASSWORD` est définie sur l'hébergement, elle est demandée dans le champ
+**Clé d'installation**. Ce n'est pas un mot de passe de connexion : c'est uniquement la preuve
+qu'on a le droit de créer le premier compte, pour qu'un inconnu ne s'empare pas du back-office
+entre le déploiement et votre première visite. Une fois un compte créé, la page se ferme d'elle-même.
+
+#### Se connecter ensuite
+
+1. Ouvrir `/admin/` : la page de connexion demande **adresse électronique + mot de passe**.
+2. La session dure sept jours ; « Se déconnecter » est en haut à droite, à côté de « Mon compte ».
+3. **Mot de passe oublié ?** en bas du formulaire : un lien valable une heure part par courriel
+   (si Brevo est configuré). Sans envoi d'emails, un propriétaire définit un mot de passe
+   provisoire depuis **Comptes → Mot de passe**.
+
+Changer de mot de passe (Mon compte) ferme immédiatement les autres sessions ouvertes.
+
+#### Comptes et rôles
+
+La section **Comptes** (visible du seul propriétaire) liste les personnes autorisées et permet
+d'inviter, suspendre, réinviter ou supprimer un accès. Trois rôles :
+
+| Rôle | Peut faire |
+|---|---|
+| Propriétaire | tout, y compris créer et supprimer des comptes |
+| Éditeur | écrire le contenu, le réseau, les réglages ; consulter messages et abonnés |
+| Lecteur | consulter seulement ; aucun enregistrement possible |
+
+La règle du dernier propriétaire est appliquée : impossible de rétrograder, suspendre ou supprimer
+le dernier propriétaire actif.
+
+Les comptes sont enregistrés dans `content/comptes.json` (empreintes scrypt, jamais les mots de
+passe). En production, cette écriture passe par l'API GitHub : elle exige donc `ADMIN_GITHUB_TOKEN`.
+Le fichier est ignoré par Git en local pour qu'un compte de test ne parte jamais dans le dépôt.
 
 #### Les sections
 
@@ -1022,11 +1051,17 @@ Un bandeau en haut de la fiche dit toujours si l'entrée est visible ou pourquoi
 #### Variables à définir sur l'hébergement
 
 ```text
-ADMIN_PASSWORD=…           # obligatoire : mot de passe du back-office
-ADMIN_SECRET=…             # recommandé : signe le cookie (sinon ADMIN_PASSWORD sert de secret)
-ADMIN_GITHUB_TOKEN=…       # token fine-grained, Contents: Read and write, ce dépôt uniquement
+ADMIN_PASSWORD=…           # clé d'installation, demandée une seule fois pour créer le premier compte
+ADMIN_SECRET=…             # signe les cookies de session (32 octets aléatoires, à ne plus changer)
+ADMIN_GITHUB_TOKEN=…       # token GitHub (classique scope `repo`, ou fine-grained Contents: R/W)
 ADMIN_GITHUB_REPO=nicearts44/integra_science
 ADMIN_GITHUB_BRANCH=main
+```
+
+Générer `ADMIN_SECRET` une fois, puis le garder :
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 Après modification des variables, redéployer une fois pour qu'elles prennent effet.

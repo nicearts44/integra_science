@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { DocName } from "@/lib/admin/schema";
-import { apiAutorisee } from "@/lib/server/admin-auth";
+import { refusApi } from "@/lib/server/admin-auth";
 import { ecrireDoc, lireDoc, validerDoc } from "@/lib/server/editorial-store";
 
 export const runtime = "nodejs";
@@ -21,8 +21,9 @@ function estDoc(valeur: string): valeur is DocName {
 }
 
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ doc: string }> }) {
-  if (!(await apiAutorisee(req))) {
-    return NextResponse.json({ ok: false, error: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  const refus = await refusApi(req, "ecriture");
+  if (refus) {
+    return NextResponse.json({ ok: false, error: refus.error }, { status: refus.status });
   }
 
   const { doc } = await ctx.params;

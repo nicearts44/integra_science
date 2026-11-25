@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { compteurs } from "@/lib/content/editorial";
-import { adminConfigure } from "@/lib/server/admin-auth";
+import { exigerAdmin } from "@/lib/server/admin-auth";
+import { nombreComptes } from "@/lib/server/comptes";
 import { modeEcriture, repoGithub } from "@/lib/server/editorial-store";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +20,12 @@ function Etat({ ok, texte }: { ok: boolean; texte: string }) {
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const compte = await exigerAdmin();
   const c = compteurs();
   const mode = modeEcriture();
+  const nbComptes = await nombreComptes();
+  const comptes = nbComptes > 0;
 
   return (
     <>
@@ -66,6 +70,17 @@ export default function DashboardPage() {
             Contenus visibles sur le site public
           </span>
         </div>
+        <div className="adm-stat">
+          <div className="l">Accès</div>
+          <div className="n">{nbComptes}</div>
+          <span className="help" style={{ fontSize: 12, color: "var(--adm-subtle)" }}>
+            {compte.role === "proprietaire" ? (
+              <Link href="/admin/comptes">Gérer les comptes →</Link>
+            ) : (
+              "Comptes autorisés"
+            )}
+          </span>
+        </div>
       </div>
 
       <div className="adm-grid-2">
@@ -102,7 +117,22 @@ export default function DashboardPage() {
           <div className="adm-panel-body">
             <table className="adm-table">
               <tbody>
-                <Etat ok={Boolean(adminConfigure())} texte="Mot de passe du back-office (ADMIN_PASSWORD)" />
+                <Etat
+                  ok={comptes}
+                  texte={
+                    comptes
+                      ? "Comptes du back-office (accès par adresse et mot de passe)"
+                      : "Aucun compte : ouvrez /admin pour créer le compte propriétaire"
+                  }
+                />
+                <Etat
+                  ok={Boolean(process.env.ADMIN_SECRET)}
+                  texte={
+                    process.env.ADMIN_SECRET
+                      ? "Clé de signature des sessions (ADMIN_SECRET)"
+                      : "ADMIN_SECRET non défini : les sessions retombent sur ADMIN_PASSWORD"
+                  }
+                />
                 <Etat ok={mode === "github"} texte={`Enregistrement : ${mode === "github" ? repoGithub() : mode === "local" ? "disque local" : "non configuré"}`} />
                 <Etat ok={Boolean(process.env.BREVO_API_KEY && process.env.CONTACT_DESTINATAIRE)} texte="Envoi des emails (Brevo)" />
                 <Etat ok={Boolean(process.env.DATABASE_URL)} texte="Base de données (formulaires et abonnés)" />

@@ -158,6 +158,45 @@ html, body { margin: 0; padding: 0; }
 }
 .adm-side-foot a:hover, .adm-side-foot button:hover { color: #fff; text-decoration: underline; }
 
+.adm-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* --------------------------------------------------------- barre haute */
+
+.adm-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 30px;
+  border-bottom: 1px solid var(--adm-line);
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.adm-who { display: flex; flex-direction: column; line-height: 1.25; }
+.adm-who strong { font-size: 13.5px; }
+.adm-who span {
+  font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--adm-subtle);
+}
+
+.adm-topbar-actions { display: flex; gap: 16px; align-items: center; font-size: 13px; }
+.adm-topbar-actions form { margin: 0; }
+.adm-topbar-actions button {
+  font: inherit; font-size: 13px;
+  background: none; border: 0; padding: 0;
+  color: var(--adm-muted);
+  cursor: pointer;
+}
+.adm-topbar-actions a { color: var(--adm-muted); }
+.adm-topbar-actions button:hover, .adm-topbar-actions a:hover {
+  color: var(--adm-accent); text-decoration: underline;
+}
+
 .adm-main { flex: 1; min-width: 0; padding: 26px 30px 60px; }
 
 .adm-head {
@@ -401,6 +440,7 @@ html, body { margin: 0; padding: 0; }
   .adm-nav-group { display: none; }
   .adm-nav a { padding: 6px 9px; font-size: 13px; }
   .adm-side-foot { flex-direction: row; flex-wrap: wrap; gap: 14px; border-top: 0; padding-top: 10px; }
+  .adm-topbar { padding: 10px 14px; position: static; }
   .adm-main { padding: 18px 14px 60px; }
   .adm-split { grid-template-columns: 1fr; }
   .adm-items { max-height: 340px; }

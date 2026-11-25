@@ -3,6 +3,11 @@ node_modules/
 out/
 build/
 data/
+
+# Comptes du back-office : écrits par l'admin en local, jamais commités en clair
+# depuis un poste de développement (en production, l'API GitHub les écrit dans
+# le dépôt pour qu'ils survivent aux redéploiements).
+content/comptes.json
 .env
 .env.local
 .env*.local

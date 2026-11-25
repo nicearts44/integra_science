@@ -1,41 +1,11 @@
 import Link from "next/link";
 
-import AdminNav from "@/components/admin/AdminNav";
-import { exigerAdmin } from "@/lib/server/admin-auth";
+import AdminNav, { type NavGroupe } from "@/components/admin/AdminNav";
+import { LIBELLES_ROLE } from "@/lib/admin/roles";
+import { exigerAdmin, peut } from "@/lib/server/admin-auth";
 import { modeEcriture } from "@/lib/server/editorial-store";
 
 export const dynamic = "force-dynamic";
-
-const groups = [
-  {
-    title: "Contenu",
-    links: [
-      { href: "/admin", label: "Tableau de bord" },
-      { href: "/admin/publications", label: "Publications" },
-      { href: "/admin/cas-usage", label: "Cas d'usage" },
-      { href: "/admin/actualites", label: "Actualités" },
-    ],
-  },
-  {
-    title: "Réseau",
-    links: [
-      { href: "/admin/reseau/membres", label: "Membres" },
-      { href: "/admin/reseau/roles", label: "Fonctions" },
-      { href: "/admin/reseau/engagements", label: "Engagements" },
-    ],
-  },
-  {
-    title: "Échanges",
-    links: [
-      { href: "/admin/messages", label: "Messages" },
-      { href: "/admin/newsletter", label: "Newsletter" },
-    ],
-  },
-  {
-    title: "Site",
-    links: [{ href: "/admin/reglages", label: "Réglages" }],
-  },
-];
 
 const MODES = {
   github: "Enregistre dans le dépôt GitHub",
@@ -44,8 +14,46 @@ const MODES = {
 } as const;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await exigerAdmin();
+  const compte = await exigerAdmin();
   const mode = modeEcriture();
+
+  const groupes: NavGroupe[] = [
+    {
+      title: "Contenu",
+      links: [
+        { href: "/admin", label: "Tableau de bord" },
+        { href: "/admin/publications", label: "Publications" },
+        { href: "/admin/cas-usage", label: "Cas d'usage" },
+        { href: "/admin/actualites", label: "Actualités" },
+      ],
+    },
+    {
+      title: "Réseau",
+      links: [
+        { href: "/admin/reseau/membres", label: "Membres" },
+        { href: "/admin/reseau/roles", label: "Fonctions" },
+        { href: "/admin/reseau/engagements", label: "Engagements" },
+      ],
+    },
+    {
+      title: "Échanges",
+      links: [
+        { href: "/admin/messages", label: "Messages" },
+        { href: "/admin/newsletter", label: "Newsletter" },
+      ],
+    },
+    {
+      title: "Site",
+      links: [{ href: "/admin/reglages", label: "Réglages" }],
+    },
+  ];
+
+  if (peut(compte.role, "comptes")) {
+    groupes.push({
+      title: "Accès",
+      links: [{ href: "/admin/comptes", label: "Comptes" }],
+    });
+  }
 
   return (
     <div className="adm-shell">
@@ -58,20 +66,40 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </span>
         </div>
 
-        <AdminNav groups={groups} />
+        <AdminNav groups={groupes} />
 
         <div className="adm-side-foot">
           <span>{MODES[mode]}</span>
           <Link href="/" target="_blank" rel="noreferrer">
             Voir le site ↗
           </Link>
-          <form action="/api/admin/logout" method="post">
-            <button type="submit">Se déconnecter</button>
-          </form>
         </div>
       </aside>
 
-      <main className="adm-main">{children}</main>
+      <div className="adm-content">
+        <div className="adm-topbar">
+          <span className="adm-who">
+            <strong>{compte.nom}</strong>
+            <span>{LIBELLES_ROLE[compte.role]}</span>
+          </span>
+          <div className="adm-topbar-actions">
+            <Link href="/admin/compte">Mon compte</Link>
+            <form action="/api/admin/logout" method="post">
+              <button type="submit">Se déconnecter</button>
+            </form>
+          </div>
+        </div>
+
+        <main className="adm-main">
+          {compte.role === "lecteur" ? (
+            <div className="adm-notice adm-notice--info">
+              Consultation seule : votre rôle ne permet pas d&apos;enregistrer de modification. Un
+              propriétaire peut changer votre rôle depuis Comptes.
+            </div>
+          ) : null}
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

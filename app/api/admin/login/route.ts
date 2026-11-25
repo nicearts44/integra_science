@@ -1,13 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { memeOrigine, ouvrirSession } from "@/lib/server/admin-auth";
 import {
-  ADMIN_COOKIE,
-  ADMIN_MAX_AGE,
-  adminConfigure,
-  memeOrigine,
-  motDePasseValide,
-  signerSession,
-} from "@/lib/server/admin-auth";
+  compteParEmail,
+  marquerConnexion,
+  nombreComptes,
+  verifierMotDePasse,
+} from "@/lib/server/comptes";
 
 export const runtime = "nodejs";
 
@@ -39,13 +38,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Origine refusée." }, { status: 403 });
   }
 
-  if (!adminConfigure() && process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { ok: false, error: "ADMIN_PASSWORD n'est pas défini sur ce serveur." },
-      { status: 503 },
-    );
-  }
-
   const ip = ipDe(req);
   if (tropDessais(ip)) {
     return NextResponse.json(
@@ -54,23 +46,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = (await req.json().catch(() => ({}))) as { password?: unknown };
+  if ((await nombreComptes()) === 0) {
+    return NextResponse.json(
+      { ok: false, error: "Aucun compte n'existe encore : créez le compte propriétaire.", installer: true },
+      { status: 409 },
+    );
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
+  const email = typeof body.email === "string" ? body.email : "";
   const motDePasse = typeof body.password === "string" ? body.password : "";
 
-  if (!motDePasseValide(motDePasse)) {
+  const compte = await compteParEmail(email);
+  if (!compte || !compte.actif || !verifierMotDePasse(compte, motDePasse)) {
     noterEssai(ip);
     await new Promise((r) => setTimeout(r, 400));
-    return NextResponse.json({ ok: false, error: "Mot de passe incorrect." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Adresse ou mot de passe incorrect." },
+      { status: 401 },
+    );
   }
 
   essais.delete(ip);
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(ADMIN_COOKIE, signerSession(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: ADMIN_MAX_AGE,
-  });
-  return res;
+  await marquerConnexion(compte.id);
+  return ouvrirSession(NextResponse.json({ ok: true, nom: compte.nom, role: compte.role }), compte);
 }

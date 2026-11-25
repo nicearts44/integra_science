@@ -1,81 +1,138 @@
 /* ===================================================================
    AUTHENTIFICATION DU BACK-OFFICE
    -------------------------------------------------------------------
-   Un seul mot de passe (ADMIN_PASSWORD), un cookie signé HMAC.
-   Pas de compte, pas de base : le back-office reste indépendant de
-   toute infrastructure, il fonctionne même sans base de données.
+   Un compte (adresse + mot de passe) et un cookie signé HMAC qui porte
+   l'identifiant du compte et la version de son mot de passe. Changer un
+   mot de passe invalide donc immédiatement les sessions ouvertes.
+
+   Trois rôles, trois capacités :
+   · lecture   — voir le back-office ;
+   · ecriture  — enregistrer du contenu, des réglages, des comptes du réseau ;
+   · comptes   — gérer les personnes qui accèdent au back-office.
    =================================================================== */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { NextResponse } from "next/server";
+
+import { compteParId, versionSession, type Compte, type Role } from "@/lib/server/comptes";
 
 export const ADMIN_COOKIE = "integra_admin";
 export const ADMIN_MAX_AGE = 60 * 60 * 24 * 7; // 7 jours
+
+export type Capacite = "lecture" | "ecriture" | "comptes";
+
+const DROITS: Record<Role, Capacite[]> = {
+  proprietaire: ["lecture", "ecriture", "comptes"],
+  editeur: ["lecture", "ecriture"],
+  lecteur: ["lecture"],
+};
+
+export function peut(role: Role, capacite: Capacite): boolean {
+  return DROITS[role].includes(capacite);
+}
 
 function secret(): string {
   return process.env.ADMIN_SECRET || process.env.ADMIN_PASSWORD || "integra-dev-secret";
 }
 
-/** Le mot de passe est-il configuré ? En production, il est obligatoire. */
-export function adminConfigure(): boolean {
-  return Boolean(process.env.ADMIN_PASSWORD);
-}
+/* ---------------------------------------------------------- signature */
 
-/** En développement seulement, un mot de passe de repli évite de bloquer. */
-function motDePasseAttendu(): string {
-  return process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "integra");
-}
-
-export function motDePasseValide(saisie: string): boolean {
-  const attendu = motDePasseAttendu();
-  if (!attendu || !saisie) return false;
-  const a = Buffer.from(saisie, "utf8");
-  const b = Buffer.from(attendu, "utf8");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-export function signerSession(): string {
-  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + ADMIN_MAX_AGE * 1000 })).toString(
-    "base64url",
-  );
+export function signerSession(compte: Compte): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      uid: compte.id,
+      v: versionSession(compte),
+      exp: Date.now() + ADMIN_MAX_AGE * 1000,
+    }),
+  ).toString("base64url");
   const signature = createHmac("sha256", secret()).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
 
-export function sessionValide(token: string | undefined): boolean {
-  if (!token) return false;
+function lirePayload(token: string | undefined): { uid: string; v: string; exp: number } | null {
+  if (!token) return null;
   const [payload, signature] = token.split(".");
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
 
   const attendue = createHmac("sha256", secret()).update(payload).digest("base64url");
   const a = Buffer.from(signature, "utf8");
   const b = Buffer.from(attendue, "utf8");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp?: number };
-    return typeof data.exp === "number" && data.exp > Date.now();
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      uid?: unknown;
+      v?: unknown;
+      exp?: unknown;
+    };
+    if (typeof data.uid !== "string" || typeof data.v !== "string") return null;
+    if (typeof data.exp !== "number" || data.exp <= Date.now()) return null;
+    return { uid: data.uid, v: data.v, exp: data.exp };
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function adminConnecte(): Promise<boolean> {
+/* ------------------------------------------------------------- session */
+
+export async function sessionCourante(): Promise<Compte | null> {
   const jar = await cookies();
-  return sessionValide(jar.get(ADMIN_COOKIE)?.value);
+  const data = lirePayload(jar.get(ADMIN_COOKIE)?.value);
+  if (!data) return null;
+
+  const compte = await compteParId(data.uid);
+  if (!compte || !compte.actif) return null;
+  if (versionSession(compte) !== data.v) return null; // mot de passe changé ailleurs
+  return compte;
+}
+
+export async function adminConnecte(): Promise<boolean> {
+  return (await sessionCourante()) !== null;
 }
 
 /** Garde de page : redirige vers la connexion si la session a expiré. */
-export async function exigerAdmin(): Promise<void> {
-  if (!(await adminConnecte())) redirect("/admin/login");
+export async function exigerAdmin(): Promise<Compte> {
+  const compte = await sessionCourante();
+  if (!compte) redirect("/admin/login");
+  return compte;
 }
 
-/** Garde d'API : renvoie false plutôt que de rediriger. */
-export async function apiAutorisee(req: Request): Promise<boolean> {
-  if (!(await adminConnecte())) return false;
-  return memeOrigine(req);
+/** Garde de page pour une capacité précise (écriture, comptes…). */
+export async function exigerCapacite(capacite: Capacite): Promise<Compte> {
+  const compte = await exigerAdmin();
+  if (!peut(compte.role, capacite)) redirect("/admin?refus=" + capacite);
+  return compte;
+}
+
+/**
+ * Garde d'API avec un motif clair : session absente, origine douteuse ou
+ * rôle insuffisant donnent trois réponses différentes et exploitables.
+ */
+export async function refusApi(
+  req: Request,
+  capacite: Capacite = "ecriture",
+): Promise<{ status: number; error: string } | null> {
+  if (!memeOrigine(req)) return { status: 403, error: "Origine refusée." };
+  const compte = await sessionCourante();
+  if (!compte) return { status: 401, error: "Session expirée. Reconnectez-vous." };
+  if (!peut(compte.role, capacite)) {
+    return { status: 403, error: "Votre rôle ne permet pas cette action." };
+  }
+  return null;
+}
+
+/** Garde d'API : renvoie le compte autorisé, ou null. */
+export async function apiAutorisee(
+  req: Request,
+  capacite: Capacite = "ecriture",
+): Promise<Compte | null> {
+  const compte = await sessionCourante();
+  if (!compte) return null;
+  if (!peut(compte.role, capacite)) return null;
+  if (!memeOrigine(req)) return null;
+  return compte;
 }
 
 /**
@@ -93,4 +150,25 @@ export function memeOrigine(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/* -------------------------------------------------------------- cookie */
+
+export const OPTIONS_COOKIE = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: ADMIN_MAX_AGE,
+};
+
+/** Ouvre la session sur la réponse et renvoie la réponse telle quelle. */
+export function ouvrirSession<T extends NextResponse>(res: T, compte: Compte): T {
+  res.cookies.set(ADMIN_COOKIE, signerSession(compte), OPTIONS_COOKIE);
+  return res;
+}
+
+export function fermerSession<T extends NextResponse>(res: T): T {
+  res.cookies.set(ADMIN_COOKIE, "", { ...OPTIONS_COOKIE, maxAge: 0 });
+  return res;
 }

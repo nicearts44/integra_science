@@ -1,14 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { settingsKeys } from "@/lib/admin/schema";
-import { apiAutorisee } from "@/lib/server/admin-auth";
+import { refusApi } from "@/lib/server/admin-auth";
 import { ecrireDoc } from "@/lib/server/editorial-store";
 
 export const runtime = "nodejs";
 
 export async function PUT(req: NextRequest) {
-  if (!(await apiAutorisee(req))) {
-    return NextResponse.json({ ok: false, error: "Session expirée. Reconnectez-vous." }, { status: 401 });
+  const refus = await refusApi(req, "ecriture");
+  if (refus) {
+    return NextResponse.json({ ok: false, error: refus.error }, { status: refus.status });
   }
 
   const body = (await req.json().catch(() => null)) as { value?: unknown } | null;

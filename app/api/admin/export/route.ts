@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { adminConnecte } from "@/lib/server/admin-auth";
+import { refusApi } from "@/lib/server/admin-auth";
 import { listerSoumissions, readSubscribers } from "@/lib/server/store";
 
 export const runtime = "nodejs";
@@ -16,8 +16,9 @@ function csv(lignes: Array<Array<unknown>>): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await adminConnecte())) {
-    return NextResponse.json({ ok: false, error: "Non autorisé." }, { status: 401 });
+  const refus = await refusApi(req, "lecture");
+  if (refus) {
+    return NextResponse.json({ ok: false, error: refus.error }, { status: refus.status });
   }
 
   const type = req.nextUrl.searchParams.get("type") ?? "newsletter";

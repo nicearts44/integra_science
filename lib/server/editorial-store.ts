@@ -1,15 +1,18 @@
 /* ===================================================================
-   STOCKAGE DU CONTENU ÉDITORIAL
+   STOCKAGE DES FICHIERS DU BACK-OFFICE
    -------------------------------------------------------------------
    Deux modes, un seul contrat :
 
-   · local  — écrit `content/<doc>.json` sur le disque (développement) ;
+   · local  — écrit `content/<fichier>.json` sur le disque (développement) ;
    · GitHub — lit et écrit le même fichier dans le dépôt via l'API
      Contents. Un enregistrement = un commit = un redéploiement Vercel.
 
    Le site public, lui, ne lit jamais ce module : il importe les JSON
    directement (lib/content/editorial.ts). Le contenu affiché est donc
    toujours une version construite, jamais un fichier en cours d'écriture.
+
+   Le même mécanisme sert au contenu éditorial (`content/*.json`) et aux
+   comptes du back-office (`content/comptes.json`).
    =================================================================== */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -70,35 +73,40 @@ export function modeEcriture(): ModeEcriture {
   return "lecture-seule";
 }
 
-export function cheminLocal(doc: DocName): string {
-  return path.join(process.cwd(), "content", FICHIERS[doc]);
+export function cheminLocal(nom: string): string {
+  return path.join(process.cwd(), "content", nom);
 }
 
 /* ------------------------------------------------------------- lecture */
 
-export async function lireDoc(doc: DocName): Promise<DocContenu> {
+/**
+ * Lit un fichier JSON du dossier `content/`. `defaut` est renvoyé quand le
+ * fichier n'existe pas encore (premier démarrage, compte initial, etc.).
+ */
+export async function lireFichierJson<T>(nom: string, defaut: T): Promise<T> {
   if (modeEcriture() === "github") {
     try {
-      return await lireGithub(doc);
+      return await lireGithub<T>(nom);
     } catch (err) {
-      console.error(`[admin] lecture GitHub impossible pour ${doc}`, err);
-      return EMBARQUE[doc];
+      if ((err as { code?: number }).code === 404) return defaut;
+      console.error(`[admin] lecture GitHub impossible pour ${nom}`, err);
+      return defaut;
     }
   }
 
-  const chemin = cheminLocal(doc);
+  const chemin = cheminLocal(nom);
   if (existsSync(chemin)) {
     try {
-      return JSON.parse(readFileSync(chemin, "utf8")) as DocContenu;
+      return JSON.parse(readFileSync(chemin, "utf8")) as T;
     } catch (err) {
-      console.error(`[admin] lecture locale impossible pour ${doc}`, err);
+      console.error(`[admin] lecture locale impossible pour ${nom}`, err);
     }
   }
-  return EMBARQUE[doc];
+  return defaut;
 }
 
-async function lireGithub(doc: DocName): Promise<DocContenu> {
-  const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${FICHIERS[doc]}?ref=${encodeURIComponent(brancheGithub())}`;
+async function lireGithub<T>(nom: string): Promise<T> {
+  const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${nom}?ref=${encodeURIComponent(brancheGithub())}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${jetonGithub()}`,
@@ -107,11 +115,12 @@ async function lireGithub(doc: DocName): Promise<DocContenu> {
     },
     cache: "no-store",
   });
+  if (res.status === 404) throw Object.assign(new Error("Fichier absent"), { code: 404 });
   if (!res.ok) throw new Error(`GitHub ${res.status} à la lecture`);
-  const data = (await res.json()) as { content?: string; encoding?: string };
+  const data = (await res.json()) as { content?: string };
   if (!data.content) throw new Error("Réponse GitHub sans contenu");
   const texte = Buffer.from(data.content, "base64").toString("utf8");
-  return JSON.parse(texte) as DocContenu;
+  return JSON.parse(texte) as T;
 }
 
 /* ------------------------------------------------------------ écriture */
@@ -122,17 +131,17 @@ export type ResultatEcriture = {
   commit?: string;
 };
 
-export async function ecrireDoc(
-  doc: DocName,
-  contenu: DocContenu,
+export async function ecrireFichierJson(
+  nom: string,
+  contenu: unknown,
   message: string,
 ): Promise<ResultatEcriture> {
   const json = `${JSON.stringify(contenu, null, 2)}\n`;
   const mode = modeEcriture();
 
   if (mode === "github") {
-    const sha = await shaGithub(doc);
-    const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${FICHIERS[doc]}`;
+    const sha = await shaGithub(nom);
+    const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${nom}`;
     const res = await fetch(url, {
       method: "PUT",
       headers: {
@@ -161,7 +170,7 @@ export async function ecrireDoc(
   }
 
   if (mode === "local") {
-    writeFileSync(cheminLocal(doc), json, "utf8");
+    writeFileSync(cheminLocal(nom), json, "utf8");
     return { mode, message: "Enregistré sur le disque local (content/)." };
   }
 
@@ -170,8 +179,8 @@ export async function ecrireDoc(
   );
 }
 
-async function shaGithub(doc: DocName): Promise<string | null> {
-  const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${FICHIERS[doc]}?ref=${encodeURIComponent(brancheGithub())}`;
+async function shaGithub(nom: string): Promise<string | null> {
+  const url = `https://api.github.com/repos/${repoGithub()}/contents/content/${nom}?ref=${encodeURIComponent(brancheGithub())}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${jetonGithub()}`,
@@ -184,6 +193,20 @@ async function shaGithub(doc: DocName): Promise<string | null> {
   if (!res.ok) throw new Error(`GitHub ${res.status} à la lecture du SHA`);
   const data = (await res.json()) as { sha?: string };
   return data.sha ?? null;
+}
+
+/* --------------------------------------------------- contenu éditorial */
+
+export async function lireDoc(doc: DocName): Promise<DocContenu> {
+  return lireFichierJson<DocContenu>(FICHIERS[doc], EMBARQUE[doc]);
+}
+
+export async function ecrireDoc(
+  doc: DocName,
+  contenu: DocContenu,
+  message: string,
+): Promise<ResultatEcriture> {
+  return ecrireFichierJson(FICHIERS[doc], contenu, message);
 }
 
 /* ------------------------------------------------------------ contrôle */
