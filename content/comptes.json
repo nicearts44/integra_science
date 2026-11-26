@@ -1,0 +1,14 @@
+{
+  "comptes": [
+    {
+      "id": "726ebb83-fea6-4876-ba92-4c61326e8938",
+      "email": "nicephoreagossou44@gmail.com",
+      "nom": "AGOSSOU",
+      "role": "proprietaire",
+      "actif": true,
+      "hash": "scrypt$3a1d4c7ada3deb447fde97ebaabeed9d$1040785f10c1d2eca72f74a83ab7b21880fcb37de8da3b400d72b179850b2022a76c84479846c43f48c45849c277dd5147f38064fc68fb595067658ee1acae9b",
+      "cree": "2026-11-26T06:51:22.729Z",
+      "maj": "2026-11-26T06:51:22.729Z"
+    }
+  ]
+}
