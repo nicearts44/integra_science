@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { findByToken, readSubscribers, writeSubscribers, type Subscriber } from "@/lib/server/store";
+import { findByToken, majStatutAbonne } from "@/lib/server/store";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
@@ -18,18 +18,14 @@ export default async function NewsletterDesinscriptionPage({ searchParams }: Pro
   const { token } = await searchParams;
   const jeton = typeof token === "string" ? token : "";
 
-  const abonne = jeton ? findByToken(jeton) : undefined;
+  const abonne = jeton ? await findByToken(jeton) : undefined;
 
   // Désinscription en un clic, sans confirmation (§ 8.9) : un lien absent
   // ou purgé donne le même message neutre qu'un lien invalide.
   const valide = !!abonne;
 
   if (valide && abonne) {
-    writeSubscribers(
-      readSubscribers().map((s): Subscriber =>
-        s.token === abonne.token ? { ...s, statut: "desinscrit" } : s,
-      ),
-    );
+    await majStatutAbonne(abonne.token, "desinscrit");
   }
 
   return (

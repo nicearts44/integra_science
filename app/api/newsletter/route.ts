@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes } from "node:crypto";
 
-import { readSubscribers, writeSubscribers, type Subscriber } from "@/lib/server/store";
+import { enregistrerAbonne, trouverParEmail, type Subscriber } from "@/lib/server/store";
 import { sendMail } from "@/lib/server/email";
 import { baseUrl } from "@/lib/content/site";
 
@@ -47,8 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL(`${redirect}?inscription=erreur`, req.url), 303);
   }
 
-  const list = readSubscribers();
-  const existing = list.find((s) => s.email === email);
+  const existing = await trouverParEmail(email);
 
   if (existing?.statut === "confirme") {
     // Déjà inscrit : même retour, jamais de révélation d'état (§ 8.9).
@@ -64,10 +63,10 @@ export async function POST(req: NextRequest) {
     date_inscription: new Date().toISOString(),
   };
 
-  const next = existing
-    ? list.map((s) => (s.email === email ? { ...record, date_inscription: s.date_inscription } : s))
-    : [...list, record];
-  writeSubscribers(next);
+  await enregistrerAbonne({
+    ...record,
+    ...(existing ? { date_inscription: existing.date_inscription } : {}),
+  });
 
   const confirmUrl = `${baseUrl()}/newsletter/confirmer/?token=${token}`;
   const sent = await sendMail({

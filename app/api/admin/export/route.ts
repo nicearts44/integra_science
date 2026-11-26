@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const date = new Date().toISOString().slice(0, 10);
 
   if (type === "newsletter") {
-    const abonnes = readSubscribers();
+    const abonnes = await readSubscribers();
     const contenu = csv([
       ["email", "nom", "interets", "statut", "date_inscription", "date_confirmation"],
       ...abonnes.map((a) => [
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === "messages") {
-    const soumissions = listerSoumissions();
+    const soumissions = await listerSoumissions();
     const cles = new Set<string>();
     for (const s of soumissions) {
       for (const cle of Object.keys(s.donnees)) cles.add(cle);

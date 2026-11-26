@@ -19,8 +19,8 @@ const STATUTS: Record<string, { label: string; classe: string }> = {
   desinscrit: { label: "Désinscrit", classe: "adm-pill" },
 };
 
-export default function NewsletterPage() {
-  const abonnes = readSubscribers();
+export default async function NewsletterPage() {
+  const abonnes = await readSubscribers();
   const confirmes = abonnes.filter((a) => a.statut === "confirme");
   const enAttente = abonnes.filter((a) => a.statut === "en_attente");
   const desinscrits = abonnes.filter((a) => a.statut === "desinscrit");

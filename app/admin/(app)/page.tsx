@@ -4,6 +4,7 @@ import { compteurs } from "@/lib/content/editorial";
 import { exigerAdmin } from "@/lib/server/admin-auth";
 import { nombreComptes } from "@/lib/server/comptes";
 import { modeEcriture, repoGithub } from "@/lib/server/editorial-store";
+import { destinataireFormulaires, emailConfigured } from "@/lib/server/email";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export default async function DashboardPage() {
   const mode = modeEcriture();
   const nbComptes = await nombreComptes();
   const comptes = nbComptes > 0;
+  const envoiEmail = await emailConfigured();
+  const destinataire = await destinataireFormulaires();
 
   return (
     <>
@@ -134,7 +137,14 @@ export default async function DashboardPage() {
                   }
                 />
                 <Etat ok={mode === "github"} texte={`Enregistrement : ${mode === "github" ? repoGithub() : mode === "local" ? "disque local" : "non configuré"}`} />
-                <Etat ok={Boolean(process.env.BREVO_API_KEY && process.env.CONTACT_DESTINATAIRE)} texte="Envoi des emails (Brevo)" />
+                <Etat
+                  ok={envoiEmail}
+                  texte={
+                    envoiEmail
+                      ? `Envoi des emails (Brevo)${destinataire ? ` — formulaires vers ${destinataire}` : " — destinataire des formulaires à renseigner"}`
+                      : "Envoi des emails : clé Brevo absente (Réglages → E-mail)"
+                  }
+                />
                 <Etat ok={Boolean(process.env.DATABASE_URL)} texte="Base de données (formulaires et abonnés)" />
               </tbody>
             </table>

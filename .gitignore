@@ -21,3 +21,4 @@ next-env.d.ts
 # Journaux du serveur local
 start.log
 *.log
+.neon

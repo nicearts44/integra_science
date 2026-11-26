@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Mot de passe oublié" };
 
-export default function MotDePasseOubliePage() {
-  const envoiPossible = emailConfigured();
+export default async function MotDePasseOubliePage() {
+  const envoiPossible = await emailConfigured();
 
   return (
     <main className="adm-entry">

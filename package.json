@@ -10,6 +10,9 @@
     "sanity:import": "node scripts/import-sanity.mjs"
   },
   "dependencies": {
+    "@neon/config": "^1.14.8",
+    "@neon/env": "^2.1.11",
+    "@neondatabase/serverless": "^1.2.1",
     "@sanity/image-url": "^1.2.0",
     "@sanity/vision": "^4.22.1",
     "next": "^15.3.0",

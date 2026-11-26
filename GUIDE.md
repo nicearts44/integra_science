@@ -88,26 +88,32 @@ npm.cmd install
 copy .env.example .env.local
 ```
 
-Ouvrir `.env.local` et renseigner — **toutes sont optionnelles en local**, le site tourne sans :
+Ouvrir `.env.local` et renseigner. Trois familles seulement :
 
 ```ini
 # URL publique (blocante pour la mise en ligne)
 NEXT_PUBLIC_SITE_URL=
 
-# Emails des formulaires (Brevo)
-BREVO_API_KEY=
-BREVO_FROM_EMAIL=
-CONTACT_DESTINATAIRE=
+# Base de donnees Neon (ecrite automatiquement par `neon init` / `neon deploy`)
+DATABASE_URL=
+DATABASE_URL_UNPOOLED=
+NEON_BRANCH=
+NEON_BRANCH_ID=
+NEON_FUNCTION_HOST_SUFFIX=
 
-# CMS Sanity (voir partie 5)
-# Studio : le préfixe NEXT_PUBLIC_ est obligatoire (variable lue par le navigateur)
-NEXT_PUBLIC_SANITY_PROJECT_ID=
-NEXT_PUBLIC_SANITY_DATASET=production
-# Site (lecture serveur)
-SANITY_PROJECT_ID=
-SANITY_DATASET=production
-SANITY_READ_TOKEN=
+# Back-office
+ADMIN_PASSWORD=      # cle d'installation, demandee une seule fois sur /admin/installer
+ADMIN_SECRET=        # signe les cookies de session (32 octets aleatoires)
+
+# Ecriture du contenu vers GitHub
+ADMIN_GITHUB_TOKEN=
+ADMIN_GITHUB_REPO=nicearts44/integra_science
+ADMIN_GITHUB_BRANCH=main
 ```
+
+**Brevo ne passe plus par l'environnement** : la cle API, l'expediteur et le destinataire se
+saisissent dans le back-office (Réglages → E-mail), et sont stockes en base. Sanity n'est plus
+utilise : le back-office gere tout le contenu.
 
 ### 2.4 Lancer
 
@@ -621,17 +627,18 @@ sur un « No package.json found ».
 4. **Environment Variables** — ajouter, pour *Production* et *Preview* :
    ```
    NEXT_PUBLIC_SITE_URL   https://votre-domaine.com
-   BREVO_API_KEY          xkeysib-…
-   BREVO_FROM_EMAIL       contact@votre-domaine.com
-   CONTACT_DESTINATAIRE   boite@votre-domaine.com
-   SANITY_PROJECT_ID      a1b2c3d4
-   SANITY_DATASET         production
-   SANITY_READ_TOKEN      sk…
-   NEXT_PUBLIC_SANITY_PROJECT_ID  a1b2c3d4
-   NEXT_PUBLIC_SANITY_DATASET     production
+   DATABASE_URL           postgresql://…  (Neon, chaine « pooler »)
+   DATABASE_URL_UNPOOLED  postgresql://…  (Neon, chaine directe)
+   NEON_BRANCH            production
+   NEON_BRANCH_ID         br-…
+   ADMIN_PASSWORD         votre cle d'installation
+   ADMIN_SECRET           32 octets aleatoires (voir 10.10)
+   ADMIN_GITHUB_TOKEN     ghp_… ou github_pat_…
+   ADMIN_GITHUB_REPO      nicearts44/integra_science
+   ADMIN_GITHUB_BRANCH    main
    ```
-   > Sur Vercel, `NEXT_PUBLIC_SANITY_*` doit aussi être présente : le Studio est compilé au build.
-   > Sans le préfixe `NEXT_PUBLIC_`, la variable n'arrive pas au navigateur.
+   Les valeurs exactes sont dans votre `.env.local` (Neon les a ecrites). Brevo n'a plus rien a
+   faire ici : il se configure dans le back-office, apres le deploiement (voir 10.11).
 5. **Deploy**. Le premier build prend 2 à 4 minutes.
 6. Ajouter le domaine : *Settings* → *Domains* → suivre les instructions DNS.
 7. Retour dans Sanity → *CORS origins* : ajouter `https://votre-domaine.com` avec credentials.
@@ -1072,12 +1079,25 @@ Un membre n'apparaît sur `/reseau/` que si les trois conditions sont réunies :
 case **Accord écrit** cochée, et un nom renseigné. Le pôle affiche alors le nom, la fonction et le
 lien ; sans membre publié, il garde « Responsable de pôle · fonction à renseigner ».
 
-#### Ce qui reste à brancher
+#### Base de données (Neon)
 
-Les sections *Messages* et *Newsletter* lisent le stockage fichier (`data/`). Sur Vercel, ce dossier
-n'est pas persistant : il faut une base (`DATABASE_URL`) pour conserver durablement les messages et
-les abonnés. Tant que ce n'est pas fait, l'email reste la source fiable pour les messages, et le
-formulaire de newsletter n'est pas réparable.
+Les messages des formulaires, les abonnés de la newsletter et les réglages serveur (clé Brevo)
+sont stockés dans **Postgres, sur Neon**. La connexion est décrite par `DATABASE_URL`, écrite dans
+`.env.local` par `neon init` / `neon deploy`.
+
+Les tables sont créées automatiquement au premier usage : `contact_submissions`,
+`newsletter_subscribers`, `app_settings`. Aucune migration à lancer à la main.
+
+Sans `DATABASE_URL`, l'application retombe sur le dossier `data/` (développement uniquement) :
+sur Vercel, ces fichiers seraient perdus à chaque déploiement.
+
+Commandes utiles, depuis le dossier du projet :
+
+```powershell
+neon status          # etat de la branche et des services
+neon connection-string
+neon psql            # ouvrir une session SQL
+```
 
 #### Revenir en arrière
 
@@ -1090,6 +1110,83 @@ git push
 ```
 
 Le déploiement Vercel repart de la version précédente.
+
+### 10.11 E-mail : configurer Brevo depuis le back-office
+
+Tout se fait dans le navigateur, après la connexion à `/admin/` : **Réglages → E-mail**. Rien n'est
+à mettre dans les variables d'environnement, et la clé n'est jamais renvoyée au navigateur.
+
+#### Étape 1 — Créer le compte Brevo
+
+1. **https://www.brevo.com** → *Sign up free*. L'offre gratuite autorise 300 emails par jour, ce qui
+   suffit largement pour les formulaires et la lettre d'information.
+2. Valider l'adresse email du compte.
+
+#### Étape 2 — Valider l'adresse d'expédition
+
+C'est l'adresse qui apparaîtra comme expéditeur dans les messages reçus. Brevo refuse d'envoyer
+avec une adresse qu'il n'a pas validée.
+
+1. Menu de gauche → **Senders, Domains & IPs** → onglet **Senders**.
+2. **Add a sender** : nom affiché (ex. `INTEGRA SCIENCE`) + adresse (ex. `contact@integra.science`).
+3. Brevo envoie un **code de validation** à cette adresse : le saisir dans Brevo.
+4. L'adresse passe au statut *Validated*. C'est exactement cette adresse qu'on mettra dans le
+   champ **Adresse d'expédition** du back-office.
+
+> Vous n'avez pas encore de boîte sur votre domaine ? Utilisez d'abord votre adresse Gmail ou
+> Outlook : elle se valide de la même façon. On pourra passer au domaine plus tard, sans rien
+> changer dans le code.
+
+#### Étape 3 — Créer la clé API
+
+1. Menu de gauche → **SMTP & API** → onglet **API Keys**.
+2. **Generate a new API key**, nom libre (ex. `integra-site`).
+3. Copier la valeur affichée : elle commence par `xkeysib-`. **Elle ne sera plus jamais montrée**
+   ensuite — si vous la perdez, il suffit d'en créer une autre et de remplacer l'ancienne dans le
+   back-office.
+
+#### Étape 4 — Renseigner le back-office
+
+1. `/admin/` → **Réglages** → panneau **E-mail (Brevo)**.
+2. Coller la clé dans **Clé API Brevo**.
+3. **Adresse d'expédition** : l'adresse validée à l'étape 2.
+4. **Nom d'expédition** : `INTEGRA SCIENCE` (ou le nom que vous voulez voir dans la boîte du
+   destinataire).
+5. **Destinataire des formulaires** : l'adresse qui doit recevoir les demandes envoyées depuis le
+   site. C'est elle qui remplace l'ancienne variable `CONTACT_DESTINATAIRE`. Vide = aucune
+   notification n'est envoyée (la demande reste enregistrée en base).
+6. **Enregistrer la configuration**.
+
+#### Étape 5 — Tester
+
+Dans le même panneau, champ **Adresse de test** → **Envoyer un test**. Le message doit arriver en
+quelques secondes. Trois réponses possibles :
+
+| Message | Cause | Ce qu'il faut faire |
+|---|---|---|
+| « Message de test envoyé à … » | tout fonctionne | rien |
+| « Brevo a refusé l'envoi » | clé fausse, ou adresse d'expédition non validée | revérifier l'étape 2 et la clé de l'étape 3 |
+| « Aucune clé API Brevo enregistrée » | la clé n'a pas été enregistrée | remplir la clé puis **Enregistrer** |
+
+#### Ce que cette configuration active
+
+| Fonction | Sans clé | Avec clé |
+|---|---|---|
+| Formulaires du site | demande enregistrée en base, aucun email | notification interne + accusé de réception au visiteur |
+| Newsletter | inscription en base, aucun email de confirmation | email de confirmation (double opt-in) |
+| Mot de passe oublié | lien non envoyé, un propriétaire pose un mot de passe provisoire | lien envoyé par email, valable une heure |
+
+#### Où sont stockées ces valeurs
+
+Dans la table `app_settings` de votre base Neon, avec le préfixe `email.` — jamais dans
+`content/reglages.json` (qui part dans le dépôt Git), jamais dans le navigateur. Seul le serveur
+les lit. Le tableau de bord du back-office affiche l'état : « Envoi des emails (Brevo) ».
+
+#### Remplacer la clé plus tard
+
+Coller la nouvelle clé dans le champ et enregistrer : l'ancienne est écrasée. Laisser le champ
+**vide** conserve la clé en place — c'est ce qui permet de modifier l'expéditeur sans avoir à
+ressaisir la clé.
 
 ---
 
@@ -1104,7 +1201,7 @@ Le déploiement Vercel repart de la version précédente.
 | Une page affiche un gabarit vide | catalogue vide **et** c'est normal | les publications s'affichent après vérification |
 | Un document n'apparaît pas sur le site | `verifie` ou `anonymise` décoché | cocher les deux, puis **Publish** |
 | `robots.txt` interdit tout | `NEXT_PUBLIC_SITE_URL` vide | renseigner la variable |
-| Formulaire : « enregistré » mais pas d'email | Brevo non configuré | renseigner `BREVO_API_KEY` et `CONTACT_DESTINATAIRE` |
+| Formulaire : « enregistré » mais pas d'email | Brevo non configuré | Réglages → E-mail : clé API et destinataire, puis « Envoyer un test » (voir 10.11) |
 | Le port 3000 est occupé | ancien serveur | `npx kill-port 3000` ou redémarrer la machine |
 | `next build` échoue sur un type | contenu ou composant modifié | lire l'erreur : elle nomme le fichier et le champ |
 | `npm error path F:\integra_science\package.json` | commande lancée à la racine au lieu de `integra-science` | `cd F:\integra_science\integra-science` |
@@ -1120,7 +1217,7 @@ Le déploiement Vercel repart de la version précédente.
 ## 12. Checklist avant mise en ligne
 
 - [ ] `NEXT_PUBLIC_SITE_URL` renseignée (blocant)
-- [ ] `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `CONTACT_DESTINATAIRE` renseignées
+- [ ] Brevo configuré depuis **Réglages → E-mail** (clé, expéditeur validé, destinataire) et test reçu
 - [ ] Identité juridique complétée (`lib/content/site.ts` ou `parametresSite`) — sinon bloc vide
 - [ ] Projet Sanity créé, CORS configuré, Studio accessible
 - [ ] `npm.cmd run build` passe sans erreur

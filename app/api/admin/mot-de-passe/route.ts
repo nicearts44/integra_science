@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   if (compte && compte.actif) {
     try {
       const jeton = await demanderReinit(compte.email);
-      if (jeton && emailConfigured()) {
+      if (jeton && (await emailConfigured())) {
         const lien = `${origine(req)}/admin/reinitialiser/?token=${encodeURIComponent(jeton)}`;
         envoye = await sendMail({
           to: compte.email,

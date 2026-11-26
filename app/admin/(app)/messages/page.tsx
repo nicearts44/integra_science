@@ -21,8 +21,8 @@ function dateLisible(valeur: string): string {
 
 const CLES_TECHNIQUES = new Set(["societe", "kind", "recu_le", "receivedAt", "ip", "origine"]);
 
-export default function MessagesPage() {
-  const soumissions = listerSoumissions();
+export default async function MessagesPage() {
+  const soumissions = await listerSoumissions();
   const baseConfiguree = Boolean(process.env.DATABASE_URL);
 
   return (

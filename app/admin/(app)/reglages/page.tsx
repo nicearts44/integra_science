@@ -1,7 +1,10 @@
+import EmailSettingsForm from "@/components/admin/EmailSettingsForm";
 import SettingsForm from "@/components/admin/SettingsForm";
 import { settingsGroups, settingsKeys } from "@/lib/admin/schema";
+import { baseConfiguree } from "@/lib/server/db";
 import { modeEcriture } from "@/lib/server/editorial-store";
 import { lireDoc } from "@/lib/server/editorial-store";
+import { lireParametresEmail, sansCle } from "@/lib/server/parametres";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +17,7 @@ export default async function ReglagesPage() {
   }
 
   const mode = modeEcriture();
+  const email = sansCle(await lireParametresEmail());
 
   return (
     <>
@@ -35,6 +39,8 @@ export default async function ReglagesPage() {
       ) : null}
 
       <SettingsForm groups={settingsGroups} initial={initial} />
+
+      <EmailSettingsForm initial={email} basePrete={baseConfiguree()} />
     </>
   );
 }

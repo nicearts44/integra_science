@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { forms, type FormConfig } from "@/lib/content/forms";
-import { siteParams } from "@/lib/content/site";
 import { saveSubmission } from "@/lib/server/store";
 import { rateLimited } from "@/lib/server/rate-limit";
-import { sendMail } from "@/lib/server/email";
+import { destinataireFormulaires, sendMail } from "@/lib/server/email";
 
 export const runtime = "nodejs";
 
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
 
   // Sauvegarde obligatoire, indépendamment de l'envoi email.
   try {
-    saveSubmission(config.kind, {
+    await saveSubmission(config.kind, {
       ...data,
       date: new Date().toISOString(),
       ip: clientIp(req),
@@ -110,11 +109,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Deux emails : notification interne + accusé de réception.
-  if (siteParams.email_destinataire) {
+  const destinataire = await destinataireFormulaires();
+  if (destinataire) {
     const body = renderBody(config, data);
     const sent = await Promise.all([
       sendMail({
-        to: siteParams.email_destinataire,
+        to: destinataire,
         subject: `[INTEGRA] ${config.title} — ${data.nom ?? ""}`,
         text: body,
         replyTo: data.email,
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       console.error("[contact] envoi email partiel ou échoué — demande enregistrée");
     }
   } else {
-    console.error("[contact] CONTACT_DESTINATAIRE non configuré — demande enregistrée sans envoi");
+    console.error("[contact] destinataire non configuré (Réglages → E-mail) — demande enregistrée sans envoi");
   }
 
   return respond(200, { ok: true, message: config.success }, `${redirect}?envoi=ok`);

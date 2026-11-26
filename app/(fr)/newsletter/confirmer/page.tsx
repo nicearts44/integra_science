@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { findByToken, readSubscribers, writeSubscribers, type Subscriber } from "@/lib/server/store";
+import { findByToken, majStatutAbonne } from "@/lib/server/store";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
@@ -21,7 +21,7 @@ export default async function NewsletterConfirmerPage({ searchParams }: Props) {
   const { token } = await searchParams;
   const jeton = typeof token === "string" ? token : "";
 
-  const abonne = jeton ? findByToken(jeton) : undefined;
+  const abonne = jeton ? await findByToken(jeton) : undefined;
   const age = abonne ? Date.now() - Date.parse(abonne.date_inscription) : Number.POSITIVE_INFINITY;
   const expire = !abonne || Number.isNaN(age) || age > SEPT_JOURS_MS;
 
@@ -30,13 +30,7 @@ export default async function NewsletterConfirmerPage({ searchParams }: Props) {
   const valide = !!abonne && !expire && abonne.statut !== "desinscrit";
 
   if (valide && abonne) {
-    writeSubscribers(
-      readSubscribers().map((s): Subscriber =>
-        s.token === abonne.token
-          ? { ...s, statut: "confirme", date_confirmation: new Date().toISOString() }
-          : s,
-      ),
-    );
+    await majStatutAbonne(abonne.token, "confirme", new Date().toISOString());
   }
 
   return (
