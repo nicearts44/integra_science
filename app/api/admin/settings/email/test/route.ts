@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { refusApi } from "@/lib/server/admin-auth";
-import { sendMail } from "@/lib/server/email";
+import { sendMailDetail } from "@/lib/server/email";
 import { lireParametresEmail } from "@/lib/server/parametres";
 
 export const runtime = "nodejs";
@@ -29,8 +29,18 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
   }
+  if (!config.expediteur_email) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Aucune adresse d'expédition enregistrée : Brevo refuse tout envoi sans expéditeur validé.",
+      },
+      { status: 422 },
+    );
+  }
 
-  const envoye = await sendMail({
+  const resultat = await sendMailDetail({
     to,
     subject: "INTEGRA SCIENCE — test de configuration email",
     text: [
@@ -43,13 +53,9 @@ export async function POST(req: NextRequest) {
     ].join("\n"),
   });
 
-  if (!envoye) {
+  if (!resultat.ok) {
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Brevo a refusé l'envoi. Vérifiez la clé API et que l'adresse d'expédition est bien validée dans Brevo.",
-      },
+      { ok: false, error: resultat.message, code: resultat.code, status_brevo: resultat.status },
       { status: 502 },
     );
   }

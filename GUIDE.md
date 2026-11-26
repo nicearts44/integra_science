@@ -1165,8 +1165,25 @@ quelques secondes. Trois réponses possibles :
 | Message | Cause | Ce qu'il faut faire |
 |---|---|---|
 | « Message de test envoyé à … » | tout fonctionne | rien |
-| « Brevo a refusé l'envoi » | clé fausse, ou adresse d'expédition non validée | revérifier l'étape 2 et la clé de l'étape 3 |
+| « Brevo refuse l'envoi depuis une adresse IP non autorisée… » | la clé API est restreinte par IP (option activée par défaut sur certains comptes) | étape 6 ci-dessous |
+| « Brevo refuse la clé API (clé invalide, révoquée ou expirée) » | clé recopiée partiellement, ou supprimée dans Brevo | régénérer la clé (étape 3) et la recoller |
+| « L'adresse d'expédition n'est pas validée dans Brevo… » | l'adresse du champ **Adresse d'expédition** n'est pas au statut *Validated* | revérifier l'étape 2 |
+| « Crédits d'envoi épuisés » | quota Brevo atteint (300/jour en gratuit) | attendre le lendemain ou passer à une offre supérieure |
 | « Aucune clé API Brevo enregistrée » | la clé n'a pas été enregistrée | remplir la clé puis **Enregistrer** |
+| « Aucune adresse d'expédition enregistrée » | champ **Adresse d'expédition** vide | renseigner l'adresse validée à l'étape 2 |
+
+#### Étape 6 — Lever la restriction d'IP (si le test échoue avec « IP non autorisée »)
+
+Brevo peut n'accepter les envois que depuis les adresses IP explicitement autorisées. Or Vercel
+change d'IP à chaque déploiement : dans ce cas, aucun envoi ne passera jamais depuis le site.
+
+1. Brevo → **Security** → onglet **Authorised IPs**.
+2. Désactiver la restriction (« Deactivate the restriction », ou supprimer toutes les adresses
+   listées).
+3. Revenir au back-office → **Réglages** → **Envoyer un test**.
+
+> Alternative : laisser la restriction active et créer une clé API dédiée sans restriction d'IP
+> (menu **SMTP & API** → **API Keys** → lors de la création, ne pas cocher la restriction par IP).
 
 #### Ce que cette configuration active
 
@@ -1202,6 +1219,7 @@ ressaisir la clé.
 | Un document n'apparaît pas sur le site | `verifie` ou `anonymise` décoché | cocher les deux, puis **Publish** |
 | `robots.txt` interdit tout | `NEXT_PUBLIC_SITE_URL` vide | renseigner la variable |
 | Formulaire : « enregistré » mais pas d'email | Brevo non configuré | Réglages → E-mail : clé API et destinataire, puis « Envoyer un test » (voir 10.11) |
+| Brevo : « IP non autorisée » (HTTP 401) | restriction d'IP active sur la clé API | § 10.11 étape 6 : désactiver la restriction dans Brevo → Security → Authorised IPs |
 | Le port 3000 est occupé | ancien serveur | `npx kill-port 3000` ou redémarrer la machine |
 | `next build` échoue sur un type | contenu ou composant modifié | lire l'erreur : elle nomme le fichier et le champ |
 | `npm error path F:\integra_science\package.json` | commande lancée à la racine au lieu de `integra-science` | `cd F:\integra_science\integra-science` |
